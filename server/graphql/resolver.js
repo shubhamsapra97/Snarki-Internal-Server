@@ -329,11 +329,11 @@ const updateClaimRequestStatus = async (args, user) => {
         };
     }
 
-    const {status, _id} = args;
-    if (!status || !_id) {
+    const {status, _id, reason} = args;
+    if (!status || !_id || !reason) {
         return {
             code: 400,
-            message: "Request Id missing!"
+            message: "Arguments missing!"
         }
     }
 
@@ -391,23 +391,22 @@ const updateClaimRequestStatus = async (args, user) => {
         }
 
         try {
-
             await updateRequestStatus({
+                reason,
                 status: "claimed",
                 requestId: _id,
                 type: "claim",
-                adminId: user.userId
+                adminId: user.userId,
             });
-
         } catch(err) {
             throw new Error(err);
         }
 
     } else if (status === "rejected") {
-
         try {
             await updateRequestStatus({
                 status,
+                reason,
                 requestId: _id,
                 type: "claim",
                 adminId: user.userId
@@ -415,7 +414,6 @@ const updateClaimRequestStatus = async (args, user) => {
         } catch(err) {
             throw new Error(err);
         }
-
     }
 
     return {

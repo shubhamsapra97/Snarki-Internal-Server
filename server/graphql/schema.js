@@ -98,6 +98,7 @@ const typeDefs = gql`
         claimRequestUpdate(
             _id: String!,
             status: String!
+            reason: String!
         ): Status
     }
 `;
