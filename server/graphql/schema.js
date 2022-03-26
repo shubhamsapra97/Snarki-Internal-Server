@@ -45,12 +45,27 @@ const typeDefs = gql`
         hours: String!
         cuisines: [String!]!
         location: Location!
+        claimed: String!
+        images: [String!]
     }
 
-    type RestaurantResult {
+    type RequestType {
+        _id: String!
+        user: User!
+        restaurant: Restaurant!
+        documents: [String!]
+    }
+
+    type RequestsResponse {
         code: Int!
         message: String!
-        restaurants: [Restaurant]
+        requests: [RequestType!]
+    }
+
+    type RequestDocumentType {
+        code: Int!
+        message: String!
+        documentUrls: [String!]
     }
 
     type Query {
@@ -59,14 +74,18 @@ const typeDefs = gql`
             password: String!
         ): Login
 
-        contact(
-            email: String!
-            firstName: String
-            lastName: String
-            comments: String!
-        ): Status
-
         me: UserData
+
+        getClaimRequests: RequestsResponse
+        getClaimRequest(
+            _id: String!
+        ): RequestsResponse
+
+        getDocuments(
+            _id: String!
+            type: String!
+        ): RequestDocumentType
+
     }
 
     type Mutation {
@@ -74,6 +93,11 @@ const typeDefs = gql`
             email: String!,
             role: String!,
             password: String!
+        ): Status
+
+        claimRequestUpdate(
+            _id: String!,
+            status: String!
         ): Status
     }
 `;
