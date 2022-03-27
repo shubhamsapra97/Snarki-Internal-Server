@@ -103,6 +103,54 @@ const findRestaurantStatus = async ({restaurantId, claimed}) => {
     });
 }
 
+const getRegisterRequests = async () => {
+    return await getDb().collection("register_restaurant_verification")
+        .aggregate([
+            {
+                $match: { status: "unregistered" }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: "user"
+                }
+            }
+        ]).toArray();
+}
+
+const getRegisterRequest = async (requestId) => {
+    return await getDb().collection("register_restaurant_verification")
+        .aggregate([
+            {
+                $match: {
+                    _id: ObjectId(requestId),
+                    status: "unregistered"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: "user"
+                }
+            }
+        ]).toArray();
+}
+
+const findSimilarRestaurants = async (filters) => {
+    return await getDb().collection("restaurants")
+        .find(filters)
+        .collation({ locale: "en", strength: 2 }) // use mongo compound collation index (case insensitive)
+        .toArray();
+}
+
+const addRestaurant = async args => {
+    return await getDb().collection("restaurants").insertOne({...args});
+}
+
 module.exports = {
     findUser,
     addUser,
@@ -112,5 +160,9 @@ module.exports = {
     updateRestaurant,
     createDocumentRecord,
     updateRequestStatus,
-    findRestaurantStatus
+    findRestaurantStatus,
+    getRegisterRequests,
+    getRegisterRequest,
+    findSimilarRestaurants,
+    addRestaurant
 };

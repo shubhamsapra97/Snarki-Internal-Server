@@ -49,11 +49,33 @@ const typeDefs = gql`
         images: [String!]
     }
 
+    type RegisterRestaurant {
+        name: String!
+        address: String!
+        city: String!
+        state: String!
+        postalCode: String!
+        contact: String!
+        hours: String!
+        cuisines: [String!]!
+        location: Location!
+        images: [String!]
+    }
+
     type RequestType {
         _id: String!
         user: User!
         restaurant: Restaurant!
         documents: [String!]
+    }
+
+    type RegisterRequestType {
+        _id: String!
+        user: User!
+        restaurant: RegisterRestaurant!
+        documents: [String!]
+        images: [String!]
+        status: String!
     }
 
     type RequestsResponse {
@@ -62,10 +84,23 @@ const typeDefs = gql`
         requests: [RequestType!]
     }
 
+    type RegisterRequestsResponse {
+        code: Int!
+        message: String!
+        requests: [RegisterRequestType!]
+    }
+
     type RequestDocumentType {
         code: Int!
         message: String!
         documentUrls: [String!]
+        imageUrls: [String!]
+    }
+
+    type RestaurantsResponse {
+        code: Int!
+        message: String!
+        restaurants: [Restaurant!]
     }
 
     type Query {
@@ -86,6 +121,15 @@ const typeDefs = gql`
             type: String!
         ): RequestDocumentType
 
+        getRegisterRequests: RegisterRequestsResponse
+        getRegisterRequest(
+            _id: String!
+        ): RegisterRequestsResponse
+
+        getSimilarRestaurants(
+            _id: String!
+        ): RestaurantsResponse
+
     }
 
     type Mutation {
@@ -96,6 +140,12 @@ const typeDefs = gql`
         ): Status
 
         claimRequestUpdate(
+            _id: String!,
+            status: String!
+            reason: String!
+        ): Status
+
+        addRequestUpdate(
             _id: String!,
             status: String!
             reason: String!

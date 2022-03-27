@@ -10,7 +10,11 @@ const {
     updateRestaurant,
     createDocumentRecord,
     updateRequestStatus,
-    findRestaurantStatus
+    findRestaurantStatus,
+    getRegisterRequests,
+    getRegisterRequest,
+    findSimilarRestaurants,
+    addRestaurant
 } = require("../data/data");
 const constants = require("../utils/constants");
 const {hashPassword, comparePassword} = require("../utils/bcrypt");
@@ -183,7 +187,7 @@ const me = async user => {
     }
 };
 
-const getRestaurantRequests = async user => {
+const getRestaurantClaimRequests = async user => {
     if (!user || user.role !== "ADMIN") {
         return {
             code: 401,
@@ -214,7 +218,6 @@ const getRestaurantRequests = async user => {
             requests: response
         }
     } catch(err) {
-        console.log(err);
         return {
             code: 500,
             message: "Something went wrong!",
@@ -314,9 +317,18 @@ const getRestaurantDocuments = async (args, user) => {
     for(let i=0; i<request.documents.length; i++) {
         documentUrls.push(getPresignedUrl(request.documents[i]));
     }
+
+    const imageUrls = [];
+    if (args.type === "register") {
+        for(let i=0; i<request.images.length; i++) {
+            imageUrls.push(getPresignedUrl(request.images[i]));
+        }
+    }
+
     return {
         code: 200,
         documentUrls,
+        imageUrls,
         message: "Document Urls fetched Successfully",
     }
 }
@@ -338,9 +350,9 @@ const updateClaimRequestStatus = async (args, user) => {
     }
 
     const searchArgs = {};
-    searchArgs["requestId"] = _id;
-    searchArgs["status"] = "unclaimed";
+    searchArgs["requestId"] = args._id;
     searchArgs["type"] = "claim";
+    searchArgs["status"] = "unclaimed";
 
     let request;
     try {
@@ -422,12 +434,322 @@ const updateClaimRequestStatus = async (args, user) => {
     }
 }
 
+const getRestaurantRegisterRequests = async user => {
+    if (!user || user.role !== "ADMIN") {
+        return {
+            code: 401,
+            message: "Unauthorised"
+        }
+    }
+
+    try {
+        let requests = await getRegisterRequests();
+        const response = [];
+
+        for(let i=0; i<requests.length; i++) {
+            const userData = { ...requests[i].user[0] };
+            delete userData.password;
+            delete userData._id;
+
+            const {
+                name,
+                address,
+                city,
+                state,
+                postalCode,
+                contact,
+                hours,
+                cuisines,
+                location
+            } = requests[i];
+
+            response.push({
+                _id: requests[i]._id,
+                user: userData,
+                documents: requests[i].documents,
+                images: requests[i].images,
+                status: requests[i].status,
+                restaurant: {
+                    name,
+                    address,
+                    city,
+                    state,
+                    postalCode,
+                    contact,
+                    hours,
+                    cuisines,
+                    location
+                }
+            });
+        }
+
+        return {
+            code: 200,
+            message: "Register Requests fetched successfully",
+            requests: response
+        }
+    } catch(err) {
+        return {
+            code: 500,
+            message: "Something went wrong!",
+        };
+    }
+};
+
+const getSimilarRestaurant = async (args, user) => {
+    if (!user || user.role !== "ADMIN") {
+        return {
+            code: 401,
+            message: "Unauthorised"
+        }
+    }
+
+    if (!args._id) {
+        return {
+            code: 400,
+            message: "Request Id missing!"
+        }
+    }
+
+    let request;
+    try {
+        request = await findRequest({
+            type: "register",
+            requestId: args._id,
+            status: "unregistered"
+        });
+        if (!request) {
+            return {
+                code: 400,
+                message: "Request not found!"
+            };
+        }
+    } catch(err) {
+        throw new Error(err);
+    }
+
+    try {
+        const restaurants = await findSimilarRestaurants({
+            name: request.name,
+            address: request.address,
+            city: request.city,
+            state: request.state,
+            postalCode: request.postalCode
+        });
+
+        return {
+            code: 200,
+            message: "Similar Restaurants fetched successfully",
+            restaurants
+        }
+    } catch(err) {
+        throw new Error(err);
+    }
+
+}
+
+const getRestaurantRegisterRequest = async (args, user) => {
+    if (!user || user.role !== "ADMIN") {
+        return {
+            code: 401,
+            message: "Unauthorised"
+        }
+    }
+
+    if (!args._id) {
+        return {
+            code: 400,
+            message: "Request Id missing!"
+        }
+    }
+
+    try {
+        let requests = await getRegisterRequest(args._id);
+        const response = [];
+        
+        if (requests.length) {
+            const userData = { ...requests[0].user[0] };
+            delete userData.password;
+            delete userData._id;
+
+            const {
+                name,
+                address,
+                city,
+                state,
+                postalCode,
+                contact,
+                hours,
+                cuisines,
+                location
+            } = requests[0];
+
+            response.push({
+                _id: requests[0]._id,
+                user: userData,
+                documents: requests[0].documents,
+                images: requests[0].images,
+                status: requests[0].status,
+                restaurant: {
+                    name,
+                    address,
+                    city,
+                    state,
+                    postalCode,
+                    contact,
+                    hours,
+                    cuisines,
+                    location
+                }
+            });
+
+            return {
+                code: 200,
+                message: "Register Request fetched successfully",
+                requests: response
+            }
+        }
+
+        return {
+            code: 200,
+            message: "Request not found!",
+            requests: response
+        }
+    } catch(err) {
+        console.log(err);
+        return {
+            code: 500,
+            message: "Something went wrong!",
+        };
+    }
+};
+
+const updateAddRequestStatus = async (args, user) => {
+    if (!user) {
+        return {
+            code: 401,
+            message: "Unauthorised"
+        };
+    }
+
+    const {status, _id, reason} = args;
+    if (!status || !_id || !reason) {
+        return {
+            code: 400,
+            message: "Arguments missing!"
+        }
+    }
+
+    const searchArgs = {};
+    searchArgs["requestId"] = args._id;
+    searchArgs["type"] = "register";
+    searchArgs["status"] = "unregistered";
+
+    let request;
+    try {
+        request = await findRequest(searchArgs);
+        if (!request) {
+            return {
+                code: 400,
+                message: "Request not found!"
+            };
+        }
+    } catch(err) {
+        throw new Error(err);
+    }
+
+    if (status === "approved") {
+
+        const {
+            name,
+            address,
+            city,
+            state,
+            postalCode,
+            contact,
+            hours,
+            cuisines,
+            location,
+            images
+        } = request;
+        console.log("ASdasd");
+
+        let addRestaurantResponse = null;
+        try {
+            // not checking if restaurant already exists
+            // as showing similar restaurants in UI
+            // needs human intervention here.
+            addRestaurantResponse = await addRestaurant({
+                name,
+                address,
+                city,
+                state,
+                postalCode,
+                contact,
+                hours,
+                cuisines,
+                location,
+                images,
+                claimed: true,
+                userId: request.userId
+            });
+        } catch(err) {
+            throw new Error(err);
+        }
+
+        if (addRestaurantResponse.insertedId) {
+            try {
+                await createDocumentRecord({
+                    documents: request.documents,
+                    restaurantId: addRestaurantResponse.insertedId
+                });
+            } catch(err) {
+                throw new Error(err);
+            }
+
+            try {
+                await updateRequestStatus({
+                    reason,
+                    status: "registered",
+                    requestId: _id,
+                    type: "register",
+                    adminId: user.userId,
+                });
+            } catch(err) {
+                throw new Error(err);
+            }
+        }
+
+    } else if (status === "rejected") {
+        try {
+            await updateRequestStatus({
+                status,
+                reason,
+                requestId: _id,
+                type: "register",
+                adminId: user.userId
+            });
+        } catch(err) {
+            throw new Error(err);
+        }
+    }
+
+    return {
+        code: 200,
+        message: "Register Request Status Updated Successfully"
+    }
+}
+
 module.exports = {
     loginUser,
     registerUser,
     me,
-    getRestaurantRequests,
+    getRestaurantClaimRequests,
     getRestaurantClaimRequest,
     getRestaurantDocuments,
-    updateClaimRequestStatus
+    updateClaimRequestStatus,
+    getRestaurantRegisterRequests,
+    getRestaurantRegisterRequest,
+    getSimilarRestaurant,
+    updateAddRequestStatus
 }
