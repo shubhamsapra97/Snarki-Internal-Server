@@ -1,4 +1,3 @@
 module.exports = {
-    mongoUrl: "/snarki/mongoUrl",
-    sendGridApiKey: "/snarki/sendGridApiKey"
+    mongoUrl: "/snarki/mongoUrl"
 }
